@@ -6,8 +6,9 @@ import { AlertCircle, Package, DollarSign, TrendingUp } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Sidebar } from '@/components/Sidebar';
 import { DashboardHeader } from '@/components/DashboardHeader';
+import { supabase } from '@/lib/supabase';
+import { User } from '@supabase/supabase-js';
 import { mockProducts } from '@/lib/mockData';
-import type { User } from '@/lib/mockData';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -15,14 +16,15 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const userStr = sessionStorage.getItem('currentUser');
-    if (!userStr) {
-      router.push('/login');
-    } else {
-      setUser(JSON.parse(userStr));
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUser(user);
+      }
       setLoading(false);
-    }
-  }, [router]);
+    };
+    getUser();
+  }, []);
 
   // Calculate KPIs
   const totalProducts = mockProducts.length;
@@ -57,7 +59,7 @@ export default function DashboardPage() {
             {/* Title */}
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-              <p className="text-gray-600">Bienvenido, {user?.name}</p>
+              <p className="text-gray-600">Bienvenido, {user?.email}</p>
             </div>
 
             {/* KPI Cards */}

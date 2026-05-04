@@ -20,12 +20,7 @@ export default function ConfiguracionPage() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    const user = sessionStorage.getItem('currentUser');
-    if (!user) {
-      router.push('/login');
-    }
-  }, [router]);
+
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>

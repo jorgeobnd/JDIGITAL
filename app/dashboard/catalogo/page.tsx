@@ -8,42 +8,62 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Sidebar } from '@/components/Sidebar';
 import { DashboardHeader } from '@/components/DashboardHeader';
-import { mockCategories, mockProviders } from '@/lib/mockData';
+import { supabase } from '@/lib/supabase';
 import type { Category, Provider } from '@/lib/mockData';
 
 export default function CatalogoPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'categories' | 'providers'>('categories');
-  const [categories, setCategories] = useState<Category[]>(mockCategories);
-  const [providers, setProviders] = useState<Provider[]>(mockProviders);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [providers, setProviders] = useState<Provider[]>([]);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [showProviderForm, setShowProviderForm] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
 
   useEffect(() => {
-    const user = sessionStorage.getItem('currentUser');
-    if (!user) {
-      router.push('/login');
-    }
-  }, [router]);
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    const { data: cats } = await supabase.from('categories').select('*').order('name');
+    if (cats) setCategories(cats);
+
+    const { data: provs } = await supabase.from('providers').select('*').order('name');
+    if (provs) setProviders(provs);
+  };
 
   const handleEditCategory = (category: Category) => {
     setEditingCategory(category);
     setShowCategoryForm(true);
   };
 
-  const handleDeleteCategory = (categoryId: string) => {
-    setCategories(categories.filter(c => c.id !== categoryId));
+  const handleDeleteCategory = async (categoryId: string) => {
+    const { error } = await supabase.from('categories').delete().eq('id', categoryId);
+    if (!error) {
+      setCategories(categories.filter(c => c.id !== categoryId));
+    }
   };
 
-  const handleSaveCategory = (category: Category) => {
+  const handleSaveCategory = async (category: Category) => {
     if (editingCategory) {
-      setCategories(
-        categories.map(c => (c.id === category.id ? category : c))
-      );
+      const { error } = await supabase.from('categories').update({
+        name: category.name,
+        description: category.description,
+      }).eq('id', category.id);
+      
+      if (!error) {
+        setCategories(categories.map(c => (c.id === category.id ? category : c)));
+      }
     } else {
-      setCategories([...categories, { ...category, id: Date.now().toString() }]);
+      const { data, error } = await supabase.from('categories').insert([{
+        name: category.name,
+        description: category.description,
+      }]).select().single();
+      
+      if (!error && data) {
+        setCategories([...categories, data]);
+      }
     }
     setShowCategoryForm(false);
     setEditingCategory(null);
@@ -54,17 +74,32 @@ export default function CatalogoPage() {
     setShowProviderForm(true);
   };
 
-  const handleDeleteProvider = (providerId: string) => {
-    setProviders(providers.filter(p => p.id !== providerId));
+  const handleDeleteProvider = async (providerId: string) => {
+    const { error } = await supabase.from('providers').delete().eq('id', providerId);
+    if (!error) {
+      setProviders(providers.filter(p => p.id !== providerId));
+    }
   };
 
-  const handleSaveProvider = (provider: Provider) => {
+  const handleSaveProvider = async (provider: Provider) => {
     if (editingProvider) {
-      setProviders(
-        providers.map(p => (p.id === provider.id ? provider : p))
-      );
+      const { error } = await supabase.from('providers').update({
+        name: provider.name,
+        description: provider.description,
+      }).eq('id', provider.id);
+      
+      if (!error) {
+        setProviders(providers.map(p => (p.id === provider.id ? provider : p)));
+      }
     } else {
-      setProviders([...providers, { ...provider, id: Date.now().toString() }]);
+      const { data, error } = await supabase.from('providers').insert([{
+        name: provider.name,
+        description: provider.description,
+      }]).select().single();
+      
+      if (!error && data) {
+        setProviders([...providers, data]);
+      }
     }
     setShowProviderForm(false);
     setEditingProvider(null);

@@ -8,13 +8,14 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Sidebar } from '@/components/Sidebar';
 import { DashboardHeader } from '@/components/DashboardHeader';
-import { mockCategories } from '@/lib/mockData';
+
 import type { Product } from '@/lib/mockData';
 import { supabase } from '@/lib/supabase';
 
 export default function ProductosPage() {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -27,16 +28,14 @@ export default function ProductosPage() {
   const itemsPerPage = 10;
 
   useEffect(() => {
-    const user = sessionStorage.getItem('currentUser');
-    if (!user) {
-      router.push('/login');
-    } else {
-      fetchProducts();
-    }
-  }, [router]);
+    fetchProducts();
+  }, []);
 
   const fetchProducts = async () => {
     setIsLoading(true);
+    const { data: cats } = await supabase.from('categories').select('*').order('name');
+    if (cats) setCategories(cats);
+
     const { data, error } = await supabase
       .from('products')
       .select('*')
@@ -189,7 +188,7 @@ export default function ProductosPage() {
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="">Todas</option>
-                    {mockCategories.map(cat => (
+                    {categories.map(cat => (
                       <option key={cat.id} value={cat.name}>
                         {cat.name}
                       </option>
@@ -375,6 +374,7 @@ export default function ProductosPage() {
       {showForm && (
         <ProductFormModal
           product={editingProduct}
+          categories={categories}
           onClose={handleCloseForm}
           onSave={async (product) => {
             const stock = parseInt(product.stock as any) || 0;
@@ -436,10 +436,12 @@ export default function ProductosPage() {
 // Product Form Modal Component
 function ProductFormModal({
   product,
+  categories,
   onClose,
   onSave,
 }: {
   product: Product | null;
+  categories: any[];
   onClose: () => void;
   onSave: (product: Product) => void;
 }) {
@@ -532,7 +534,7 @@ function ProductFormModal({
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
               >
                 <option value="">Selecciona una categoría</option>
-                {mockCategories.map(cat => (
+                {categories.map(cat => (
                   <option key={cat.id} value={cat.name}>
                     {cat.name}
                   </option>

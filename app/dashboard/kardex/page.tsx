@@ -17,12 +17,7 @@ export default function KardexPage() {
   const [dateTo, setDateTo] = useState('');
   const [movements, setMovements] = useState<any[]>([]);
 
-  useEffect(() => {
-    const user = sessionStorage.getItem('currentUser');
-    if (!user) {
-      router.push('/login');
-    }
-  }, [router]);
+
 
   const handleConsult = () => {
     if (!selectedProduct) {

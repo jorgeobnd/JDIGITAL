@@ -8,35 +8,50 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Sidebar } from '@/components/Sidebar';
 import { DashboardHeader } from '@/components/DashboardHeader';
-import { mockMovements, mockProducts } from '@/lib/mockData';
+import { supabase } from '@/lib/supabase';
 
 export default function MovimientosPage() {
   const router = useRouter();
-  const [movements, setMovements] = useState(mockMovements);
-  const [filteredMovements, setFilteredMovements] = useState(mockMovements);
+  const [movements, setMovements] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [filteredMovements, setFilteredMovements] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [selectedMovement, setSelectedMovement] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
 
   const itemsPerPage = 10;
 
   useEffect(() => {
-    const user = sessionStorage.getItem('currentUser');
-    if (!user) {
-      router.push('/login');
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    const { data: prods } = await supabase.from('products').select('*');
+    if (prods) {
+      const formattedProds = prods.map((item: any) => ({
+        ...item,
+        buyPrice: item.buyprice,
+        sellPrice: item.sellprice
+      }));
+      setProducts(formattedProds);
     }
-  }, [router]);
+
+    const { data: movs } = await supabase.from('movements').select('*').order('date', { ascending: false });
+    if (movs) {
+      setMovements(movs);
+      setFilteredMovements(movs);
+    }
+  };
 
   useEffect(() => {
     let filtered = movements;
 
     if (searchTerm) {
       filtered = filtered.filter(m => {
-        const product = mockProducts.find(p => p.id === m.productId);
+        const product = products.find(p => p.id === m.productId);
         return (
           product?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           product?.sku.toLowerCase().includes(searchTerm.toLowerCase())
@@ -62,7 +77,7 @@ export default function MovimientosPage() {
 
     setFilteredMovements(filtered);
     setCurrentPage(1);
-  }, [searchTerm, selectedType, dateFrom, dateTo, movements]);
+  }, [searchTerm, selectedType, dateFrom, dateTo, movements, products]);
 
   const totalPages = Math.ceil(filteredMovements.length / itemsPerPage);
   const paginatedMovements = filteredMovements.slice(
@@ -71,7 +86,7 @@ export default function MovimientosPage() {
   );
 
   const getProductName = (productId: string) => {
-    return mockProducts.find(p => p.id === productId)?.name || 'Producto desconocido';
+    return products.find(p => p.id === productId)?.name || 'Producto desconocido';
   };
 
   const getTypeLabel = (type: string) => {
@@ -112,7 +127,6 @@ export default function MovimientosPage() {
               </div>
               <Button
                 onClick={() => {
-                  setSelectedMovement(null);
                   setShowForm(true);
                 }}
                 className="bg-green-600 hover:bg-green-700 gap-2"
@@ -125,13 +139,12 @@ export default function MovimientosPage() {
             {/* Registration Form */}
             {showForm && (
               <MovementFormCard
-                product={selectedMovement}
+                products={products}
                 onClose={() => {
                   setShowForm(false);
-                  setSelectedMovement(null);
                 }}
-                onSave={(movement) => {
-                  setMovements([movement, ...movements]);
+                onSave={() => {
+                  fetchData();
                   setShowForm(false);
                 }}
               />
@@ -329,13 +342,13 @@ export default function MovimientosPage() {
 
 // Movement Form Component
 function MovementFormCard({
-  product,
+  products,
   onClose,
   onSave,
 }: {
-  product?: any;
+  products: any[];
   onClose: () => void;
-  onSave: (movement: any) => void;
+  onSave: () => void;
 }) {
   const [movementType, setMovementType] = useState<'entrada' | 'salida' | 'ajuste' | 'devolucion'>('entrada');
   const [selectedProduct, setSelectedProduct] = useState('');
@@ -345,6 +358,7 @@ function MovementFormCard({
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
   const [cartItems, setCartItems] = useState<any[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleAddToCart = () => {
     if (!selectedProduct || !quantity) {
@@ -352,7 +366,7 @@ function MovementFormCard({
       return;
     }
 
-    const prod = mockProducts.find(p => p.id === selectedProduct);
+    const prod = products.find(p => p.id === selectedProduct);
     if (!prod) return;
 
     if (movementType === 'salida' && parseInt(quantity) > prod.stock) {
@@ -360,12 +374,15 @@ function MovementFormCard({
       return;
     }
 
+    const price = movementType === 'entrada' ? Number(prod.buyPrice) || 0 : Number(prod.sellPrice) || 0;
+    const qty = parseInt(quantity) || 0;
+
     const cartItem = {
       productId: selectedProduct,
       productName: prod.name,
-      quantity: parseInt(quantity),
-      price: movementType === 'entrada' ? prod.buyPrice : prod.sellPrice,
-      subtotal: parseInt(quantity) * (movementType === 'entrada' ? prod.buyPrice : prod.sellPrice),
+      quantity: qty,
+      price: price,
+      subtotal: qty * price,
     };
 
     setCartItems([...cartItems, cartItem]);
@@ -373,7 +390,7 @@ function MovementFormCard({
     setQuantity('');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (cartItems.length === 0) {
@@ -391,21 +408,45 @@ function MovementFormCard({
       return;
     }
 
-    // Create movement record
-    cartItems.forEach(item => {
+    setIsSaving(true);
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    const userId = user?.id || '1';
+
+    // Create movement records
+    for (const item of cartItems) {
       const movement = {
-        id: Date.now().toString() + Math.random(),
-        date: new Date(),
+        date: new Date().toISOString(),
         type: movementType,
         productId: item.productId,
         quantity: item.quantity,
-        userId: sessionStorage.getItem('currentUser') ? JSON.parse(sessionStorage.getItem('currentUser')!).id : '1',
+        userId: userId,
         notes: notes || reason,
+        unit_price: item.price,
+        total_price: item.subtotal,
       };
-      onSave(movement);
-    });
 
-    onClose();
+      // 1. Insertar Movimiento
+      await supabase.from('movements').insert([movement]);
+
+      // 2. Actualizar Stock del Producto
+      const prod = products.find(p => p.id === item.productId);
+      if (prod) {
+        let newStock = prod.stock;
+        if (movementType === 'entrada' || movementType === 'devolucion' || movementType === 'ajuste') {
+          newStock += item.quantity;
+        } else if (movementType === 'salida') {
+          newStock -= item.quantity;
+        }
+
+        if (newStock !== prod.stock) {
+          await supabase.from('products').update({ stock: newStock }).eq('id', prod.id);
+        }
+      }
+    }
+
+    setIsSaving(false);
+    onSave();
   };
 
   return (
@@ -446,7 +487,7 @@ function MovementFormCard({
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             >
               <option value="">Selecciona un producto</option>
-              {mockProducts.map(p => (
+              {products.map(p => (
                 <option key={p.id} value={p.id}>
                   {p.name} (Stock: {p.stock})
                 </option>
@@ -577,12 +618,12 @@ function MovementFormCard({
                       {item.productName}
                     </p>
                     <p className="text-xs text-gray-600">
-                      {item.quantity} x ${item.price.toLocaleString()}
+                      {item.quantity} x ${item.price?.toLocaleString()}
                     </p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-semibold text-gray-900">
-                      ${item.subtotal.toLocaleString()}
+                      ${item.subtotal?.toLocaleString()}
                     </p>
                     <button
                       type="button"
@@ -600,7 +641,7 @@ function MovementFormCard({
             <div className="mt-3 pt-3 border-t border-gray-200 flex items-center justify-between">
               <p className="text-sm font-medium text-gray-900">Total</p>
               <p className="text-lg font-bold text-gray-900">
-                ${cartItems.reduce((sum, item) => sum + item.subtotal, 0).toLocaleString()}
+                ${cartItems.reduce((sum, item) => sum + (item.subtotal || 0), 0).toLocaleString()}
               </p>
             </div>
           </div>
@@ -613,15 +654,16 @@ function MovementFormCard({
             onClick={onClose}
             variant="outline"
             className="flex-1"
+            disabled={isSaving}
           >
             Cancelar
           </Button>
           <Button
             type="submit"
-            disabled={cartItems.length === 0}
+            disabled={cartItems.length === 0 || isSaving}
             className="flex-1 bg-green-600 hover:bg-green-700"
           >
-            Registrar Movimiento
+            {isSaving ? 'Guardando...' : 'Registrar Movimiento'}
           </Button>
         </div>
       </form>

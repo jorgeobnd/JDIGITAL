@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { mockUsers } from '@/lib/mockData';
+import { supabase } from '@/lib/supabase';
 import { Mail, Lock, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
@@ -50,21 +50,23 @@ export default function LoginPage() {
 
     setLoading(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      const user = mockUsers.find(
-        u => u.email === email && u.password === password
-      );
+    setLoading(true);
 
-      if (user) {
-        // Store user data in sessionStorage for demo
-        sessionStorage.setItem('currentUser', JSON.stringify(user));
-        router.push('/dashboard');
-      } else {
-        setError('Email o contraseña incorrectos');
-      }
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (signInError) {
+      setError('Email o contraseña incorrectos');
       setLoading(false);
-    }, 500);
+      return;
+    }
+
+    if (data.user) {
+      router.push('/dashboard');
+    }
+    setLoading(false);
   };
 
   return (

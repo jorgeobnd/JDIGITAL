@@ -25,12 +25,7 @@ import {
 export default function ReportesPage() {
   const router = useRouter();
 
-  useEffect(() => {
-    const user = sessionStorage.getItem('currentUser');
-    if (!user) {
-      router.push('/login');
-    }
-  }, [router]);
+
 
   // Prepare data for charts
   const categorySales = mockProducts.reduce((acc, product) => {
