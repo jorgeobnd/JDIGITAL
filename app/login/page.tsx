@@ -101,7 +101,7 @@ export default function LoginPage() {
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <Input
                   type="email"
-                  placeholder="admin@jdigital.com"
+                  placeholder="tucorreo@ejemplo.com"
                   value={email}
                   onChange={handleEmailChange}
                   className={`pl-10 ${emailError ? 'border-red-500 focus:ring-red-500' : ''}`}
@@ -148,17 +148,6 @@ export default function LoginPage() {
               {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </Button>
           </form>
-
-          {/* Demo Credentials */}
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-xs text-gray-600 text-center mb-2">
-              Credenciales de prueba:
-            </p>
-            <div className="bg-gray-50 p-2 rounded text-xs text-gray-700 space-y-1">
-              <p><strong>Admin:</strong> admin@jdigital.com / Admin123!</p>
-              <p><strong>Vendedor:</strong> vendedor1@jdigital.com / Vendedor123!</p>
-            </div>
-          </div>
         </div>
       </Card>
     </div>

@@ -4,21 +4,28 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { LogOut, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { User as UserType } from '@/lib/mockData';
+import { supabase } from '@/lib/supabase';
 
 export function DashboardHeader() {
   const router = useRouter();
-  const [user, setUser] = useState<UserType | null>(null);
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    const userStr = sessionStorage.getItem('currentUser');
-    if (userStr) {
-      setUser(JSON.parse(userStr));
-    }
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUser({
+          name: user.email?.split('@')[0] || 'Usuario',
+          role: 'admin',
+          avatar: user.email?.charAt(0).toUpperCase() || 'U'
+        });
+      }
+    };
+    fetchUser();
   }, []);
 
-  const handleLogout = () => {
-    sessionStorage.removeItem('currentUser');
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     router.push('/login');
   };
 
@@ -28,7 +35,7 @@ export function DashboardHeader() {
     <header className="fixed top-0 right-0 left-0 md:left-64 z-10 bg-white border-b border-gray-200 h-16">
       <div className="h-full px-6 flex items-center justify-between">
         {/* Logo for mobile */}
-        <div className="md:hidden flex items-center gap-2">
+        <div className="md:hidden flex items-center gap-2 pl-12">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
             <span className="text-white font-bold text-sm">J</span>
           </div>
